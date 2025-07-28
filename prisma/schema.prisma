@@ -1,0 +1,230 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id            String   @id @default(cuid())
+  clerkId       String   @unique
+  email         String   @unique
+  name          String
+  location      String?
+  profileImage  String?
+  rating        Float    @default(0)
+  totalRatings  Int      @default(0)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  // Relations
+  items         Item[]
+  bookings      Booking[]
+  bids          Bid[]
+  sentMessages  Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
+  notifications Notification[]
+  givenRatings  Rating[] @relation("GivenRatings")
+  receivedRatings Rating[] @relation("ReceivedRatings")
+  inquiries     Inquiry[]
+  wishlistItems WishlistItem[]
+  reports       Report[]
+
+  @@map("users")
+}
+
+model Item {
+  id          String   @id @default(cuid())
+  title       String
+  description String
+  category    String
+  price       Float
+  type        ItemType
+  startDate   DateTime?
+  endDate     DateTime?
+  images      String[]
+  location    Json // {lat: number, lng: number, address: string}
+  available   Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  ownerId     String
+  owner       User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  bookings    Booking[]
+  bids        Bid[]
+  messages    Message[]
+  inquiries   Inquiry[]
+  wishlistItems WishlistItem[]
+  reports     Report[]
+  ratings     Rating[] 
+
+  @@map("items")
+}
+
+
+model Booking {
+  id         String        @id @default(cuid())
+  startDate  DateTime
+  endDate    DateTime
+  totalCost  Float
+  status     BookingStatus @default(PENDING)
+  returned   Boolean       @default(false)
+  isLate     Boolean       @default(false)
+  createdAt  DateTime      @default(now())
+  updatedAt  DateTime      @updatedAt
+
+  // Relations
+  itemId     String
+  item       Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  borrowerId String
+  borrower   User @relation(fields: [borrowerId], references: [id], onDelete: Cascade)
+
+  @@map("bookings")
+}
+
+model Bid {
+  id        String   @id @default(cuid())
+  amount    Float
+  isWinning Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Relations
+  itemId   String
+  item     Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  bidderId String
+  bidder   User @relation(fields: [bidderId], references: [id], onDelete: Cascade)
+
+  @@map("bids")
+}
+
+model Message {
+  id        String   @id @default(cuid())
+  content   String
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  // Relations
+  senderId   String
+  sender     User @relation("SentMessages", fields: [senderId], references: [id], onDelete: Cascade)
+  receiverId String
+  receiver   User @relation("ReceivedMessages", fields: [receiverId], references: [id], onDelete: Cascade)
+  itemId     String?
+  item       Item? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
+  @@map("messages")
+}
+
+model Notification {
+  id        String           @id @default(cuid())
+  type      NotificationType
+  title     String
+  content   String
+  read      Boolean          @default(false)
+  actionUrl String?
+  createdAt DateTime         @default(now())
+
+  // Relations
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model Rating {
+  id        String   @id @default(cuid())
+  rating    Int      @db.SmallInt
+  comment   String?
+  createdAt DateTime @default(now())
+
+  // Relations
+  raterId     String
+  rater       User @relation("GivenRatings", fields: [raterId], references: [id], onDelete: Cascade)
+  ratedUserId String
+  ratedUser   User @relation("ReceivedRatings", fields: [ratedUserId], references: [id], onDelete: Cascade)
+  itemId      String?
+  item        Item? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
+  @@map("ratings")
+}
+
+model Inquiry {
+  id         String    @id @default(cuid())
+  question   String
+  answer     String?
+  answeredAt DateTime?
+  createdAt  DateTime  @default(now())
+
+  // Relations
+  itemId  String
+  item    Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+  askerId String
+  asker   User @relation(fields: [askerId], references: [id], onDelete: Cascade)
+
+  @@map("inquiries")
+}
+
+model WishlistItem {
+  id        String   @id @default(cuid())
+  createdAt DateTime @default(now())
+
+  // Relations
+  userId String
+  user   User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  itemId String
+  item   Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, itemId])
+  @@map("wishlist_items")
+}
+
+model Report {
+  id          String     @id @default(cuid())
+  reason      String
+  description String?
+  screenshot  String?
+  status      ReportStatus @default(PENDING)
+  createdAt   DateTime   @default(now())
+
+  // Relations
+  reporterId String
+  reporter   User @relation(fields: [reporterId], references: [id], onDelete: Cascade)
+  itemId     String?
+  item       Item? @relation(fields: [itemId], references: [id], onDelete: SetNull)
+
+  @@map("reports")
+}
+
+// Enums
+enum ItemType {
+  RENT
+  SELL
+  GIVEAWAY
+}
+
+enum BookingStatus {
+  PENDING
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum NotificationType {
+  MESSAGE
+  BOOKING
+  RETURN
+  BID
+  MATCH
+  SYSTEM
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  RESOLVED
+}
